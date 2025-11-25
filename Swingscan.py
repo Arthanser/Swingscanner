@@ -60,11 +60,11 @@ def scan_stock(ticker, period='1y', interval='1d'):
         # ==================== FILTER ====================
         if (latest['Close'] > latest['SMA50'] > latest['SMA200'] and
             latest['RSI'] < 50 and
-            rel_vol > 1.5 and
+            rel_vol > 1.2 and
             latest['ATR'] / latest['Close'] > 0.01 and
             latest['MACD'] > latest['MACDSignal'] and
             latest['Close'] > latest['LowerBB'] and
-            latest['ADX'] > 25 and
+            latest['ADX'] > 20 and
             latest['StochK'] > latest['StochD']):
 
             return {
