@@ -4,35 +4,35 @@ import pandas as pd
 import yfinance as yf
 import datetime
 
-st.set_page_config(page_title="Swing Scanner – Alle Märkte", layout="wide")
-st.title("Swingtrading Bullish Pullback Scanner – Alle US-Aktien")
+# ==================== FESTE S&P 100 LISTE (kein Web-Scraping!) ====================
+SP100_TICKERS = [
+    "AAPL","MSFT","GOOGL","GOOG","AMZN","NVDA","META","TSLA","BRK-B","JPM",
+    "UNH","V","MA","LLY","HD","PG","JNJ","XOM","AVGO","MRK","ABBV","CVX",
+    "KO","PEP","COST","ADBE","TMO","CRM","AMD","NFLX","ACN","LIN","MCD",
+    "ABT","CSCO","DIS","TMUS","WFC","TXN","QCOM","AMGN","INTU","NOW",
+    "IBM","PM","UNP","HON","GE","CAT","RTX","NEE","GS","SBUX","BKNG",
+    "MDT","LMT","GILD","ISRG","SPGI","BMY","ELV","SYK","ADP","AXP","T",
+    "VRTX","REGN","PGR","PLD","BLK","CB","AMT","SCHW","CI","DE","MO",
+    "BA","MDLZ","MMC","KLAC","SO","DUK","ZTS","ICE","SHW","ITW","CL",
+    "LRCX","BSX","CME","TGT","EOG","BDX","APH","PNC","EMR","FDX","MSI",
+    "NSC","HUM","ANET","CSX","WM","ORLY","MCO","ECL","AZO"
+]
 
-# Liste der S&P 500 Ticker automatisch laden
-@st.cache_data(ttl=86400)  # einmal pro Tag neu laden
-def get_sp500_tickers():
-    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    table = pd.read_html(url)[0]
-    return table['Symbol'].str.replace('.', '-', regex=False).tolist()
+# ==================== STREAMLIT APP ====================
+st.set_page_config(page_title="S&P 100 Swing Scanner", layout="wide")
+st.title("Swingtrading Bullish Pullback Scanner – S&P 100")
 
-# Optionen
-scan_mode = st.radio("Was möchtest du scannen?", 
-                     ["S&P 500 (ca. 500 Aktien)", "Nasdaq-100", "Meine eigene Liste"])
+scan_mode = st.radio("Scan-Modus", ["S&P 100 (100 Top-Aktien)", "Eigene Liste"])
 
-if scan_mode == "Meine eigene Liste":
+if scan_mode == "S&P 100 (100 Top-Aktien)":
+    tickers = SP100_TICKERS
+    st.info(f"S&P 100 geladen → {len(tickers)} Aktien")
+else:
     tickers_input = st.text_area("Ticker (kommagetrennt)", height=120)
     tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()]
-else:
-    with st.spinner("Lade Aktienliste..."):
-        if scan_mode == "S&P 500 (ca. 500 Aktien)":
-            tickers = get_sp500_tickers()
-            st.info(f"S&P 500 geladen → {len(tickers)} Aktien")
-        elif scan_mode == "Nasdaq-100":
-            ndx = pd.read_html("https://en.wikipedia.org/wiki/Nasdaq-100")[4]
-            tickers = ndx['Ticker'].tolist()
-            st.info(f"Nasdaq-100 geladen → {len(tickers)} Aktien")
 
-if st.button("Scan starten – alle Aktien durchsuchen", type="primary"):
-    with st.spinner(f"Scanne {len(tickers)} Aktien – kann 30–90 Sekunden dauern..."):
+if st.button("Scan starten", type="primary"):
+    with st.spinner(f"Scanne {len(tickers)} Aktien..."):
         results = []
         progress = st.progress(0)
         for i, ticker in enumerate(tickers):
@@ -46,8 +46,6 @@ if st.button("Scan starten – alle Aktien durchsuchen", type="primary"):
             st.success(f"{len(df)} Bullish Pullback Setups gefunden!")
             st.dataframe(df.sort_values("RSI"), use_container_width=True)
             csv = df.to_csv(index=False).encode()
-            st.download_button("CSV herunterladen", csv, "swing_setups.csv", "text/csv")
+            st.download_button("CSV herunterladen", csv, "sp100_setups.csv", "text/csv")
         else:
-            st.info("Heute keine Setups – Markt ist zu stark oder zu schwach. Morgen wieder versuchen!")
-
-st.caption(f"Stand: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}")
+            st.info("Heute keine Setups im S&P 100 – Markt ist sehr stark oder sehr schwach.")
