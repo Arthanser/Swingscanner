@@ -15,8 +15,11 @@ def scan_stock(ticker, period='1y', interval='1d'):
         data['SMA50'] = ta.sma(data['Close'], length=50)
         data['SMA200'] = ta.sma(data['Close'], length=200)
         data['RSI'] = ta.rsi(data['Close'], length=14)
+       # Relative Volume sicher berechnen (vermeidet pandas-ta-Konflikt)
         data['AvgVolume'] = data['Volume'].rolling(window=20).mean()
-        data['RelVolume'] = data['Volume'] / data['AvgVolume']
+        data['RelVolume_temp'] = data['Volume'] / data['AvgVolume']      # temporäre Spalte
+        data['RelVolume'] = data['RelVolume_temp']                       # jetzt sauber zuweisen
+        data = data.drop(columns=['RelVolume_temp'])                     # temp-Spalte wieder löschen
         data['ATR'] = ta.atr(data['High'], data['Low'], data['Close'], length=14)
         macd_data = ta.macd(data['Close'])
         data['MACD'] = macd_data['MACD_12_26_9']
