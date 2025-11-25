@@ -1,27 +1,34 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import talib
+import pandas_ta as ta  # Ersetzt TA-Lib – einfacher für Cloud
 import datetime
 
-# Funktion zum Scannen einer einzelnen Aktie (aus deinem vorherigen Code)
+# Funktion zum Scannen einer einzelnen Aktie
 def scan_stock(ticker, period='1y', interval='1d'):
     try:
         data = yf.download(ticker, period=period, interval=interval)
         if data.empty:
             return None
         
-        # Indikatoren berechnen
-        data['SMA50'] = talib.SMA(data['Close'], timeperiod=50)
-        data['SMA200'] = talib.SMA(data['Close'], timeperiod=200)
-        data['RSI'] = talib.RSI(data['Close'], timeperiod=14)
+        # Indikatoren berechnen mit pandas_ta
+        data['SMA50'] = ta.sma(data['Close'], length=50)
+        data['SMA200'] = ta.sma(data['Close'], length=200)
+        data['RSI'] = ta.rsi(data['Close'], length=14)
         data['AvgVolume'] = data['Volume'].rolling(window=20).mean()
         data['RelVolume'] = data['Volume'] / data['AvgVolume']
-        data['ATR'] = talib.ATR(data['High'], data['Low'], data['Close'], timeperiod=14)
-        data['MACD'], data['MACDSignal'], _ = talib.MACD(data['Close'])
-        data['UpperBB'], data['MiddleBB'], data['LowerBB'] = talib.BBANDS(data['Close'], timeperiod=20)
-        data['ADX'] = talib.ADX(data['High'], data['Low'], data['Close'], timeperiod=14)
-        data['StochK'], data['StochD'] = talib.STOCH(data['High'], data['Low'], data['Close'])
+        data['ATR'] = ta.atr(data['High'], data['Low'], data['Close'], length=14)
+        macd_data = ta.macd(data['Close'])
+        data['MACD'] = macd_data['MACD_12_26_9']
+        data['MACDSignal'] = macd_data['MACDs_12_26_9']
+        bbands = ta.bbands(data['Close'], length=20)
+        data['UpperBB'] = bbands['BBU_20_2.0']
+        data['MiddleBB'] = bbands['BBM_20_2.0']
+        data['LowerBB'] = bbands['BBL_20_2.0']
+        data['ADX'] = ta.adx(data['High'], data['Low'], data['Close'], length=14)['ADX_14']
+        stoch = ta.stoch(data['High'], data['Low'], data['Close'])
+        data['StochK'] = stoch['STOCHk_14_3_3']
+        data['StochD'] = stoch['STOCHd_14_3_3']
         
         # Letzter Datensatz
         latest = data.iloc[-1]
@@ -42,7 +49,6 @@ def scan_stock(ticker, period='1y', interval='1d'):
                 'RelVolume': round(latest['RelVolume'], 2),
                 'ATR': round(latest['ATR'], 2),
                 'ADX': round(latest['ADX'], 2),
-                # Füge weitere Werte hinzu, falls gewünscht
             }
         return None
     except Exception as e:
