@@ -88,7 +88,7 @@ st.title("Swingtrading Bullish Pullback Scanner")
 
 tickers_input = st.text_area(
     "Ticker (kommagetrennt)",
-    value="AAPL,MSFT,GOOGL,AMZN,TSLA,NVDA,META,JPM,V,MA,UNH,HD,PG,BAC,WFC,LLY,AVGO",
+    value="TSLA,NVDA,META,AMD,SMCI,COIN,HOOD,PLTR,CRWD,ARM,UBER,AFRM,MARA,RIOT,SHOP,SNOW,ZS,NET,PATH,GTLB",
     height=100
 )
 
