@@ -1,106 +1,45 @@
+# ==================== STREAMLIT APP – ALLE S&P 500 ====================
 import streamlit as st
-import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+import yfinance as yf
 import datetime
 
-def scan_stock(ticker, period='1y', interval='1d'):
-    try:
-        data = yf.download(ticker, period=period, interval=interval, progress=False)
-        if data.empty or len(data) < 200:
-            return None
+st.set_page_config(page_title="Swing Scanner – Alle Märkte", layout="wide")
+st.title("Swingtrading Bullish Pullback Scanner – Alle US-Aktien")
 
-        # --- Indikatoren mit Sicherheits-Checks ---
-        data['SMA50']  = ta.sma(data['Close'], length=50)
-        data['SMA200'] = ta.sma(data['Close'], length=200)
-        data['RSI']    = ta.rsi(data['Close'], length=14)
+# Liste der S&P 500 Ticker automatisch laden
+@st.cache_data(ttl=86400)  # einmal pro Tag neu laden
+def get_sp500_tickers():
+    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    table = pd.read_html(url)[0]
+    return table['Symbol'].str.replace('.', '-', regex=False).tolist()
 
-        # MACD
-        macd = ta.macd(data['Close'])
-        if macd is None or macd.empty:
-            return None
-        data['MACD']       = macd['MACD_12_26_9']
-        data['MACDSignal'] = macd['MACDs_12_26_9']
+# Optionen
+scan_mode = st.radio("Was möchtest du scannen?", 
+                     ["S&P 500 (ca. 500 Aktien)", "Nasdaq-100", "Meine eigene Liste"])
 
-        # Bollinger Bands
-        bb = ta.bbands(data['Close'], length=20)
-        if bb is None or bb.empty:
-            return None
-        data['LowerBB'] = bb['BBL_20_2.0']
+if scan_mode == "Meine eigene Liste":
+    tickers_input = st.text_area("Ticker (kommagetrennt)", height=120)
+    tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()]
+else:
+    with st.spinner("Lade Aktienliste..."):
+        if scan_mode == "S&P 500 (ca. 500 Aktien)":
+            tickers = get_sp500_tickers()
+            st.info(f"S&P 500 geladen → {len(tickers)} Aktien")
+        elif scan_mode == "Nasdaq-100":
+            ndx = pd.read_html("https://en.wikipedia.org/wiki/Nasdaq-100")[4]
+            tickers = ndx['Ticker'].tolist()
+            st.info(f"Nasdaq-100 geladen → {len(tickers)} Aktien")
 
-        # ADX
-        adx_data = ta.adx(data['High'], data['Low'], data['Close'], length=14)
-        if adx_data is None or adx_data.empty:
-            return None
-        data['ADX'] = adx_data['ADX_14']
-
-        # Stochastic
-        stoch = ta.stoch(data['High'], data['Low'], data['Close'])
-        if stoch is None or stoch.empty:
-            return None
-        data['StochK'] = stoch['STOCHk_14_3_3']
-        data['StochD'] = stoch['STOCHd_14_3_3']
-
-        # ATR
-        data['ATR'] = ta.atr(data['High'], data['Low'], data['Close'], length=14)
-        if data['ATR'].isna().all():
-            return None
-
-        # Relative Volume (sicher)
-        data['AvgVolume_20'] = data['Volume'].rolling(window=20).mean()
-        data['my_rel_volume'] = data['Volume'] / data['AvgVolume_20']
-
-        latest = data.iloc[-1]
-        rel_vol = latest['my_rel_volume']
-
-        # --- Nur wenn alle Werte gültig sind ---
-        if pd.isna(latest[['SMA50','SMA200','RSI','MACD','MACDSignal','LowerBB','ADX','StochK','StochD','ATR']]).any():
-            return None
-
-        # ==================== FILTER ====================
-        if (latest['Close'] > latest['SMA50'] > latest['SMA200'] and
-            latest['RSI'] < 50 and
-            rel_vol > 1.2 and
-            latest['ATR'] / latest['Close'] > 0.01 and
-            latest['MACD'] > latest['MACDSignal'] and
-            latest['Close'] > latest['LowerBB'] and
-            latest['ADX'] > 20 and
-            latest['StochK'] > latest['StochD']):
-
-            return {
-                'Ticker': ticker,
-                'Close':  round(latest['Close'], 2),
-                'RSI':    round(latest['RSI'], 1),
-                'RelVol': round(rel_vol, 2),
-                'ATR%':   round(latest['ATR']/latest['Close']*100, 2),
-                'ADX':    round(latest['ADX'], 1),
-            }
-        return None
-
-    except Exception as e:
-        # st.error(f"Fehler bei {ticker}: {e}")   # auskommentiert für saubere Optik
-        return None
-
-
-# ==================== STREAMLIT APP ====================
-st.set_page_config(page_title="Swing Scanner", layout="wide")
-st.title("Swingtrading Bullish Pullback Scanner")
-
-tickers_input = st.text_area(
-    "Ticker (kommagetrennt)",
-    value="TSLA,NVDA,META,AMD,SMCI,COIN,HOOD,PLTR,CRWD,ARM,UBER,AFRM,MARA,RIOT,SHOP,SNOW,ZS,NET,PATH,GTLB",
-    height=100
-)
-
-tickers = [t.strip().upper() for t in tickers_input.split(',') if t.strip()]
-
-if st.button("Scan starten", type="primary"):
-    with st.spinner(f"Scanne {len(tickers)} Aktien..."):
+if st.button("Scan starten – alle Aktien durchsuchen", type="primary"):
+    with st.spinner(f"Scanne {len(tickers)} Aktien – kann 30–90 Sekunden dauern..."):
         results = []
-        for ticker in tickers:
+        progress = st.progress(0)
+        for i, ticker in enumerate(tickers):
             result = scan_stock(ticker)
             if result:
                 results.append(result)
+            progress.progress((i + 1) / len(tickers))
 
         if results:
             df = pd.DataFrame(results)
@@ -109,6 +48,6 @@ if st.button("Scan starten", type="primary"):
             csv = df.to_csv(index=False).encode()
             st.download_button("CSV herunterladen", csv, "swing_setups.csv", "text/csv")
         else:
-            st.info("Aktuell keine Setups – vielleicht später nochmal scannen?")
+            st.info("Heute keine Setups – Markt ist zu stark oder zu schwach. Morgen wieder versuchen!")
 
 st.caption(f"Stand: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}")
